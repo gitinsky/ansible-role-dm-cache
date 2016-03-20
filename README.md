@@ -6,6 +6,16 @@ This role is currently designed for pretty custom lvm setup, please apply it car
 
 Role is Ubuntu oriented and as dm-cache is not available in 14.04 it performs upgrade to 16.04 and reboots your server.
 
+## Usage
+
+```yml
+- hosts: dm-cached
+  become: yes
+  become_method: sudo
+  roles:
+      - { role: dm-cache, hdd_lv: rootfs, ssd_drive: sdb1 }
+```
+
 ## Details
 
 Some usefull info [here](http://blog-vpodzime.rhcloud.com/?p=45) and [here](https://bugs.launchpad.net/ubuntu/+source/lvm2/+bug/1423796)
