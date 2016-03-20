@@ -1,0 +1,82 @@
+- name: upgrade to 16.04
+  shell: do-release-upgrade -d -f DistUpgradeViewNonInteractive
+  when: ansible_distribution_version == '14.04'
+  register: do_upgrade
+
+- name: Reboot after upgrade
+  command: shutdown -r now "Ansible kernel update applied"
+  async: 0
+  poll: 0
+  ignore_errors: true
+  when: do_upgrade|changed
+  register: rebooting
+
+- name: Wait for instance to come online (10 minute timeout)
+  sudo: false
+  local_action:
+    module: wait_for
+    host: "{{ ansible_ssh_host|default(inventory_hostname) }}"
+    port: "{{ ansible_ssh_port|default(ssh_port) }}"
+    delay: 30
+    timeout: 600
+    state: started
+  when: do_upgrade|changed
+
+- name: recollect facts
+  action: setup
+  when: do_upgrade|changed
+
+- name: get hdd_lv name
+  shell: lvdisplay -C|grep "\s{{ hdd_lv }}\s"|awk {'print $2'}
+  #lvdisplay|grep "LV Path"|awk {'print $3'}|grep "/{{ hdd_lv }}$"
+  changed_when: no
+  register: hdd_vg
+  tags: test
+
+- name: get lv_ssd name
+  shell: pvdisplay /dev/{{ ssd_drive }}|grep "VG Name"|awk {'print $3'}
+  changed_when: no
+  register: ssd_vg
+  tags: test
+
+- debug: msg="ssd_vg={{ ssd_vg.stdout }}, hdd_vg={{ hdd_vg.stdout }}"
+
+- name: remove ssd vg
+  shell: vgremove -f {{ ssd_vg.stdout }}
+  when: ssd_vg.stdout != '' and ssd_vg.stdout != hdd_vg.stdout
+# lvg: vg={{ ssd_vg.stdout }} force=yes state=absent # if lvg results in module failure, use shell instead
+
+- name: extend hdd vg to ssd
+  shell: vgextend {{ hdd_vg.stdout }} /dev/{{ ssd_drive }}
+  when: ssd_vg.stdout != '' and ssd_vg.stdout != hdd_vg.stdout
+
+- name: check if cache is already presented
+  shell: lvs -o lv_layout|grep cache
+  register: cache_presented
+  failed_when: no
+  changed_when: cache_presented.rc != 0
+
+- name: create cache
+  shell: bash -c "lvcreate --type cache -l100%FREE -n ssd_cache --cachepolicy {{ cache_policy }} --cachemode {{ cache_mode }} {{ hdd_vg.stdout }}/{{ hdd_lv }} /dev/{{ ssd_drive }}"
+  when: cache_presented.changed
+
+- name: install missing packages
+  apt: name=thin-provisioning-tools
+
+# - name: put missing modules
+#   lineinfile:
+#     line: "{{ item }}"
+#     backup: yes
+#     dest: /etc/initramfs-tools/modules
+#     insertafter: EOF
+#   notify: update initramfs
+#   with_items:
+#       - dm_cache
+#       - dm_cache_mq
+#       - dm_cache_smq
+#       - dm_persistent_data
+#       - dm_bufio
+
+- name: put initramfs hook
+  template: src=lvmcache.sh dest=/etc/initramfs-tools/hooks mode=755
+  notify: update initramfs

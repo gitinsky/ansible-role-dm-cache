@@ -1,0 +1,4 @@
+cache_policy: mq
+# cache_policy: smq
+cache_mode: writeback
+# cache_mode: writethrough
