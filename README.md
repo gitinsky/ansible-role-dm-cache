@@ -18,7 +18,7 @@ Role is Ubuntu oriented and as dm-cache is not available in 14.04 it performs up
 
 ## Details
 
-Some usefull info [here](http://blog-vpodzime.rhcloud.com/?p=45) and [here](https://bugs.launchpad.net/ubuntu/+source/lvm2/+bug/1423796)
+Some useful info [here](https://storageapis.wordpress.com/2015/03/20/bcache-and-vs-lvm-cache/) and [here](https://bugs.launchpad.net/ubuntu/+source/lvm2/+bug/1423796)
 
 [Issue](http://askubuntu.com/questions/736532/lvmcache-failed-to-boot-device-mapper-cache-policy-unknown-policy-type) about boot failures.
 
